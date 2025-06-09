@@ -3,3 +3,4 @@ basic-pitch
 librosa
 mido
 python-rtmidi
+numpy<2.0
