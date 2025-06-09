@@ -1,0 +1,5 @@
+{
+  "name": "Python 3.10 for Muing Project",
+  "image": "mcr.microsoft.com/devcontainers/python:3.10",
+  "postCreateCommand": "pip install --upgrade pip && pip install -r requirements.txt"
+}
