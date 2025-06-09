@@ -1,0 +1,5 @@
+demucs
+basic-pitch
+librosa
+mido
+python-rtmidi
