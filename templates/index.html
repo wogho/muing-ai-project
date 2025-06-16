@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Muing AI 분석기</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 50px auto; background-color: #f4f4f9; color: #333; }
+        h1 { text-align: center; color: #4a4a4a; }
+        form { display: flex; flex-direction: column; gap: 15px; padding: 25px; border: 1px solid #ddd; border-radius: 8px; background-color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input[type="file"] { border: 1px solid #ccc; padding: 10px; border-radius: 4px; }
+        input[type="submit"] { background-color: #5e72e4; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; transition: background-color 0.3s; }
+        input[type="submit"]:hover:not(:disabled) { background-color: #324cdd; }
+        input[type="submit"]:disabled { background-color: #aaa; cursor: not-allowed; }
+        #status { margin-top: 20px; padding: 15px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 1.1em; }
+        .info { background-color: #e2e3e5; color: #383d41;}
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        h2 { border-bottom: 2px solid #5e72e4; padding-bottom: 5px; color: #4a4a4a; }
+        #json-result { background-color: #2d2d2d; color: #f2f2f2; border: 1px solid #444; padding: 15px; margin-top: 10px; border-radius: 8px; white-space: pre-wrap; max-height: 400px; overflow-y: auto; text-align: left; font-family: 'Courier New', Courier, monospace; }
+    </style>
+</head>
+<body>
+    <h1>🎵 Muing AI 분석 엔진 v1</h1>
+    <form id="upload-form">
+        <label for="audio_file">분석할 오디오 파일을 선택하세요:</label>
+        <input type="file" id="audio_file" name="audio_file" accept=".mp3,.wav,.m4a,audio/*" required>
+        <input type="submit" value="분석 시작">
+    </form>
+    <div id="status"></div>
+    
+    <h2>분석 결과 타임라인 (JSON):</h2>
+    <pre id="json-result"></pre>
+
+    <script>
+        const form = document.getElementById('upload-form');
+        const statusDiv = document.getElementById('status');
+        const jsonResultDiv = document.getElementById('json-result');
+        const submitButton = form.querySelector('input[type="submit"]');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            statusDiv.textContent = '파일 업로드 및 분석 중... (최대 몇 분 정도 소요될 수 있습니다)';
+            statusDiv.className = 'info';
+            jsonResultDiv.textContent = '';
+            submitButton.disabled = true;
+
+            const formData = new FormData(form);
+            
+            try {
+                const response = await fetch('/analyze', { method: 'POST', body: formData });
+                const result = await response.json();
+
+                if (response.ok) {
+                    statusDiv.textContent = `✅ 분석 완료! BPM: ${result.bpm}`;
+                    statusDiv.className = 'success';
+                    jsonResultDiv.textContent = JSON.stringify(result, null, 2);
+                } else {
+                    statusDiv.textContent = `❌ 오류: ${result.error}`;
+                    statusDiv.className = 'error';
+                }
+            } catch (error) {
+                statusDiv.textContent = '❌ 서버와 통신 중 오류가 발생했습니다.';
+                statusDiv.className = 'error';
+            } finally {
+                submitButton.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

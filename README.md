@@ -1,4 +1,4 @@
-# Muing AI 분석 엔진 (Muing AI Analysis Engine)
+# Muing AI 분석 엔진 (Muing AI Analysis Engine) v1.5
 
 이 프로젝트는 '뮤잉(Muing)' 서비스를 위한 핵심 백엔드 분석 엔진입니다. 오디오 파일을 입력받아 멜로디, 코드, 리듬 등 핵심적인 음악 요소를 자동으로 분석하고, 구조화된 데이터로 추출합니다.
 

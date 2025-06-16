@@ -7,3 +7,4 @@ python-rtmidi
 numpy<2.0
 Compatibility
 pandas
+Flask
