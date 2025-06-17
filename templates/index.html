@@ -3,70 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Muing AI 분석기</title>
+    <title>스템 분리 서비스 (최종)</title>
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 50px auto; background-color: #f4f4f9; color: #333; }
-        h1 { text-align: center; color: #4a4a4a; }
-        form { display: flex; flex-direction: column; gap: 15px; padding: 25px; border: 1px solid #ddd; border-radius: 8px; background-color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        input[type="file"] { border: 1px solid #ccc; padding: 10px; border-radius: 4px; }
-        input[type="submit"] { background-color: #5e72e4; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; transition: background-color 0.3s; }
-        input[type="submit"]:hover:not(:disabled) { background-color: #324cdd; }
-        input[type="submit"]:disabled { background-color: #aaa; cursor: not-allowed; }
-        #status { margin-top: 20px; padding: 15px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 1.1em; }
-        .info { background-color: #e2e3e5; color: #383d41;}
-        .success { background-color: #d4edda; color: #155724; }
-        .error { background-color: #f8d7da; color: #721c24; }
-        h2 { border-bottom: 2px solid #5e72e4; padding-bottom: 5px; color: #4a4a4a; }
-        #json-result { background-color: #2d2d2d; color: #f2f2f2; border: 1px solid #444; padding: 15px; margin-top: 10px; border-radius: 8px; white-space: pre-wrap; max-height: 400px; overflow-y: auto; text-align: left; font-family: 'Courier New', Courier, monospace; }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding-top: 50px; }
+        form { border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
+        #result-container { margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; min-width: 400px; }
+        .result-item { margin-bottom: 10px; }
+        .result-item span { font-weight: bold; display: block; margin-bottom: 5px; }
+        audio { width: 100%; }
     </style>
 </head>
 <body>
-    <h1>🎵 Muing AI 분석 엔진 v1</h1>
-    <form id="upload-form">
+
+    <h1>🎵 스템 분리 서비스</h1>
+    
+    <form id="analysis-form">
         <label for="audio_file">분석할 오디오 파일을 선택하세요:</label>
+        <br><br>
         <input type="file" id="audio_file" name="audio_file" accept=".mp3,.wav,.m4a,audio/*" required>
+        <br><br>
         <input type="submit" value="분석 시작">
     </form>
-    <div id="status"></div>
-    
-    <h2>분석 결과 타임라인 (JSON):</h2>
-    <pre id="json-result"></pre>
+
+    <div id="status" style="margin-top: 20px;"></div>
+
+    <div id="result-container" style="display:none;">
+        <h3>분석 결과</h3>
+        <div id="result-list"></div>
+    </div>
 
     <script>
-        const form = document.getElementById('upload-form');
+        // HTML 요소들을 가져옵니다.
+        const form = document.getElementById('analysis-form');
+        const audioFileInput = document.getElementById('audio_file');
         const statusDiv = document.getElementById('status');
-        const jsonResultDiv = document.getElementById('json-result');
-        const submitButton = form.querySelector('input[type="submit"]');
+        const resultContainer = document.getElementById('result-container');
+        const resultList = document.getElementById('result-list');
 
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault();
+        // 상태를 주기적으로 확인할 때 사용할 변수입니다.
+        let statusInterval;
 
-            statusDiv.textContent = '파일 업로드 및 분석 중... (최대 몇 분 정도 소요될 수 있습니다)';
-            statusDiv.className = 'info';
-            jsonResultDiv.textContent = '';
-            submitButton.disabled = true;
+        // '분석 시작' 버튼을 눌렀을 때의 동작입니다.
+        form.addEventListener('submit', function(event) {
+            // form의 기본 동작(페이지 새로고침)을 막습니다.
+            event.preventDefault(); 
+            
+            const file = audioFileInput.files[0];
+            if (!file) {
+                statusDiv.textContent = '❌ 파일을 먼저 선택해 주세요.';
+                return;
+            }
 
             const formData = new FormData(form);
+            statusDiv.textContent = '✅ 주문 접수! 서버에서 AI 모델을 실행합니다... (시간이 걸립니다)';
+            resultContainer.style.display = 'none';
+            resultList.innerHTML = '';
             
-            try {
-                const response = await fetch('/analyze', { method: 'POST', body: formData });
-                const result = await response.json();
+            // 이전에 실행되던 상태 확인이 있다면 중지시킵니다.
+            if(statusInterval) clearInterval(statusInterval);
 
-                if (response.ok) {
-                    statusDiv.textContent = `✅ 분석 완료! BPM: ${result.bpm}`;
-                    statusDiv.className = 'success';
-                    jsonResultDiv.textContent = JSON.stringify(result, null, 2);
+            // 1. '/analyze'를 호출하여 백그라운드 작업을 시작시킵니다.
+            fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // 서버가 "처리 중"이라는 응답과 함께 작업 ID를 주면,
+                if (data.status === 'processing' && data.task_id) {
+                    // 2. 3초마다 작업 상태 확인을 시작합니다.
+                    statusInterval = setInterval(() => {
+                        checkTaskStatus(data.task_id);
+                    }, 3000);
                 } else {
-                    statusDiv.textContent = `❌ 오류: ${result.error}`;
-                    statusDiv.className = 'error';
+                    statusDiv.textContent = '❌ 서버에서 작업을 시작하지 못했습니다.';
                 }
-            } catch (error) {
+            })
+            .catch(error => {
+                console.error(error);
                 statusDiv.textContent = '❌ 서버와 통신 중 오류가 발생했습니다.';
-                statusDiv.className = 'error';
-            } finally {
-                submitButton.disabled = false;
-            }
+            });
         });
+
+        // 3. 작업 상태를 주기적으로 확인하는 함수입니다.
+        function checkTaskStatus(taskId) {
+            fetch(`/status/${taskId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'complete') {
+                    // 4. 작업이 완료되면, 상태 확인을 중지하고 결과를 화면에 표시합니다.
+                    clearInterval(statusInterval);
+                    statusDiv.textContent = `✅ ${data.message}`;
+                    
+                    if (data.result_files) {
+                        resultContainer.style.display = 'block';
+                        for (const [stemName, fileUrl] of Object.entries(data.result_files)) {
+                            const div = document.createElement('div');
+                            div.className = 'result-item';
+                            div.innerHTML = `
+                                <span>${stemName.toUpperCase()}</span>
+                                <audio controls src="${fileUrl}"></audio>
+                            `;
+                            resultList.appendChild(div);
+                        }
+                    }
+                } else if (data.status === 'error') {
+                    // 작업 중 오류가 발생하면, 상태 확인을 중지하고 오류 메시지를 표시합니다.
+                    clearInterval(statusInterval);
+                    statusDiv.textContent = `❌ 처리 중 오류 발생: ${data.message}`;
+                } else {
+                    // 아직 "처리 중"이면, 화면에 점을 찍어 살아있음을 표시합니다.
+                    statusDiv.textContent += '.';
+                }
+            })
+            .catch(error => {
+                // 상태 확인 자체에 오류가 발생하면 중지합니다.
+                clearInterval(statusInterval);
+                console.error('상태 확인 오류:', error);
+            });
+        }
     </script>
 </body>
 </html>
