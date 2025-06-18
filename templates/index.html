@@ -11,6 +11,7 @@
         .result-item { margin-bottom: 10px; }
         .result-item span { font-weight: bold; display: block; margin-bottom: 5px; }
         audio { width: 100%; }
+        a { margin-top: 15px; }
     </style>
 </head>
 <body>
@@ -33,19 +34,15 @@
     </div>
 
     <script>
-        // HTML 요소들을 가져옵니다.
         const form = document.getElementById('analysis-form');
         const audioFileInput = document.getElementById('audio_file');
         const statusDiv = document.getElementById('status');
         const resultContainer = document.getElementById('result-container');
         const resultList = document.getElementById('result-list');
 
-        // 상태를 주기적으로 확인할 때 사용할 변수입니다.
         let statusInterval;
 
-        // '분석 시작' 버튼을 눌렀을 때의 동작입니다.
         form.addEventListener('submit', function(event) {
-            // form의 기본 동작(페이지 새로고침)을 막습니다.
             event.preventDefault(); 
             
             const file = audioFileInput.files[0];
@@ -59,22 +56,18 @@
             resultContainer.style.display = 'none';
             resultList.innerHTML = '';
             
-            // 이전에 실행되던 상태 확인이 있다면 중지시킵니다.
             if(statusInterval) clearInterval(statusInterval);
 
-            // 1. '/analyze'를 호출하여 백그라운드 작업을 시작시킵니다.
             fetch('/analyze', {
                 method: 'POST',
                 body: formData
             })
             .then(response => response.json())
             .then(data => {
-                // 서버가 "처리 중"이라는 응답과 함께 작업 ID를 주면,
                 if (data.status === 'processing' && data.task_id) {
-                    // 2. 3초마다 작업 상태 확인을 시작합니다.
                     statusInterval = setInterval(() => {
                         checkTaskStatus(data.task_id);
-                    }, 3000);
+                    }, 3000); // 3초마다 상태 확인
                 } else {
                     statusDiv.textContent = '❌ 서버에서 작업을 시작하지 못했습니다.';
                 }
@@ -85,18 +78,19 @@
             });
         });
 
-        // 3. 작업 상태를 주기적으로 확인하는 함수입니다.
         function checkTaskStatus(taskId) {
             fetch(`/status/${taskId}`)
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'complete') {
-                    // 4. 작업이 완료되면, 상태 확인을 중지하고 결과를 화면에 표시합니다.
                     clearInterval(statusInterval);
                     statusDiv.textContent = `✅ ${data.message}`;
                     
+                    resultContainer.style.display = 'block';
+                    resultList.innerHTML = ''; // 이전 결과 비우기
+
+                    // 오디오 파일 결과 표시
                     if (data.result_files) {
-                        resultContainer.style.display = 'block';
                         for (const [stemName, fileUrl] of Object.entries(data.result_files)) {
                             const div = document.createElement('div');
                             div.className = 'result-item';
@@ -107,17 +101,24 @@
                             resultList.appendChild(div);
                         }
                     }
+
+                    // 최종 타임라인 JSON 파일 다운로드 링크 표시
+                    if (data.timeline_file) {
+                        const link = document.createElement('a');
+                        link.href = data.timeline_file;
+                        link.textContent = '결과 타임라인 다운로드 (muing_timeline.json)';
+                        link.download = 'muing_timeline.json';
+                        resultList.appendChild(link);
+                    }
+
                 } else if (data.status === 'error') {
-                    // 작업 중 오류가 발생하면, 상태 확인을 중지하고 오류 메시지를 표시합니다.
                     clearInterval(statusInterval);
                     statusDiv.textContent = `❌ 처리 중 오류 발생: ${data.message}`;
                 } else {
-                    // 아직 "처리 중"이면, 화면에 점을 찍어 살아있음을 표시합니다.
                     statusDiv.textContent += '.';
                 }
             })
             .catch(error => {
-                // 상태 확인 자체에 오류가 발생하면 중지합니다.
                 clearInterval(statusInterval);
                 console.error('상태 확인 오류:', error);
             });
